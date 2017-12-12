@@ -1,10 +1,13 @@
 #include <boost/bind.hpp>
 #include "callback_registry.h"
+#include "debug.h"
 
 CallbackRegistry::CallbackRegistry() : mutex(mtx_recursive), condvar(mutex) {
 }
 
 void CallbackRegistry::add(Rcpp::Function func, double secs) {
+  // Copies of the Rcpp::Function should only be made on the main thread.
+  ASSERT_MAIN_THREAD()
   Timestamp when(secs);
   Callback cb(when, func);
   Guard guard(mutex);
@@ -43,6 +46,7 @@ bool CallbackRegistry::due(const Timestamp& time) const {
 }
 
 std::vector<Callback> CallbackRegistry::take(size_t max, const Timestamp& time) {
+  ASSERT_MAIN_THREAD()
   Guard guard(mutex);
   std::vector<Callback> results;
   while (this->due(time) && (max <= 0 || results.size() < max)) {
@@ -53,6 +57,7 @@ std::vector<Callback> CallbackRegistry::take(size_t max, const Timestamp& time) 
 }
 
 bool CallbackRegistry::wait(double timeoutSecs) const {
+  ASSERT_MAIN_THREAD()
   if (timeoutSecs < 0) {
     // "1000 years ought to be enough for anybody" --Bill Gates
     timeoutSecs = 3e10;
